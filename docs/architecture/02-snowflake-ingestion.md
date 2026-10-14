@@ -89,14 +89,15 @@ Before merging events into the target table, we can load them into a staging tab
 For illustration, assume that each event contains the following fields:
 
 
-- `query_id` — identifier of a query execution.
-- `event_timestamp` — timestamp associated with the source event.
-- `user_id` — identifier of the user who executed the query.
-- `query_text` — SQL text submitted for execution.
-- `execution_duration_ms` — elapsed execution time, where available.
-- `cpu_time_ms` — CPU time consumed by the query, where available.
-- `processed_bytes` — amount of input data processed, where available.
-- `processed_rows` — number of processed rows, where available.
+- `query_id` - identifier of a query execution.
+- `event_timestamp` - timestamp associated with the source event.
+- `user_id` - identifier of the user who executed the query.
+- `team_id` - identifier of a team that a user is a part of
+- `query_text` - SQL text submitted for execution.
+- `execution_duration_ms` - elapsed execution time, where available.
+- `cpu_time_ms` - CPU time consumed by the query, where available.
+- `processed_bytes` - amount of input data processed, where available.
+- `processed_rows` - number of processed rows, where available.
 
 These are example fields. The actual staging schema must be based on the source event structure.
 
@@ -107,6 +108,7 @@ CREATE OR REPLACE TABLE STAGED_QUERY_EVENTS (
     query_id VARCHAR,
     event_timestamp TIMESTAMP_NTZ,
     user_id VARCHAR,
+    team_id VARCHAR,
     query_text VARCHAR,
     cpu_time_ms NUMBER,
     execution_duration_ms NUMBER,
@@ -208,6 +210,7 @@ INSERT INTO RAW_QUERY_EVENTS (
     query_id,
     event_timestamp,
     user_id,
+    team_id,
     query_text,
     execution_duration_ms,
     cpu_time_ms,
@@ -218,6 +221,7 @@ SELECT
     s.query_id,
     s.event_timestamp,
     s.user_id,
+    s.team_id,
     s.query_text,
     s.execution_duration_ms,
     s.cpu_time_ms,
@@ -244,12 +248,13 @@ The loading process must also account for concurrent runs if multiple ingestion 
 
 ## 7. User and Team Metadata
 
-User and team metadata may be available from separate source table, such as `STAGED_USERS` and `RAW_USERS`. These tables could contain following fields:
+User and team metadata may be available from separate source table, such as `STAGED_USERS`, `RAW_USERS` and `STAGED_TEAMS`, `RAW_TEAMS`. These tables could contain following fields and some additional information if accessible:
 
-- `user_id` — identifier of the user who executed the query.
-- `user_name` — username of a user.
-- `team_id` — identifier of a team that a user was a part of when this query was executed.
-- `team_name` — name of a team.
+- `user_id` - identifier of the user who executed the query.
+- `user_name` - username of a user.
+
+- `team_id` - identifier of a team that a user was a part of when this query was executed.
+- `team_name` - name of a team.
 
 These datasets are joined during downstream transformations to associate each query execution with the relevant user and team.
 
