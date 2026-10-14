@@ -38,8 +38,6 @@ flowchart TD
 
 ### Snowflake ingestion
 
-### Snowflake ingestion
-
 The raw Apache Iceberg tables stored in Amazon S3 must be made available in Snowflake before they can be transformed into the analytical model.
 
 This part of the pipeline is also within the scope of the project. We will describe and implement the necessary steps to access the source data in Snowflake and populate the corresponding raw tables, depending on the available Snowflake and Iceberg configuration.
