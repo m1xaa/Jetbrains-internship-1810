@@ -1,6 +1,6 @@
 # Analytics Queries
 
-Here are written queries that answer the quesiton form the task's description. 
+Here are written queries that answer the quesitons form the task's description. 
 
 ## 1. Distinct Users Querying a Table During a Period
 
