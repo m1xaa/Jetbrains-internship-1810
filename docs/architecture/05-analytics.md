@@ -7,7 +7,6 @@ Here are written queries that answer the quesitons form the task's description.
 Count the distinct users who queried a table during a given period
 
 ```sql
-
 SELECT 
     COUNT(DISTINCT fq.user_id) as distinct_users
 FROM fact_query fq
@@ -20,7 +19,6 @@ WHERE dt.catalog_name = 'iceberg'
     AND dt.table_name = 'orders'
     AND fq.event_timestamp >= '2026-10-01'
     AND fq.event_timestamp < '2026-11-01';
-
 ```
 
 ## 2. Resource Consumption by a Team During a Period
@@ -28,7 +26,6 @@ WHERE dt.catalog_name = 'iceberg'
 Calculate the total resources consumed by a team during a given period. The metrics include CPU time, query execution duration, processed bytes and processed rows.
 
 ```sql
-
 SELECT
     t.team_name,
     SUM(fq.cpu_time_ms) AS total_cpu_time_ms,
@@ -42,7 +39,6 @@ WHERE t.team_name = 'Team Y'
   AND fq.event_timestamp >= '2026-10-01'
   AND fq.event_timestamp < '2026-11-01'
 GROUP BY t.team_name;
-
 ```
 
 ## Important

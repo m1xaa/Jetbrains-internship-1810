@@ -444,3 +444,64 @@ The scheduler can be implemented using Snowflake Tasks or an external orchestrat
 The appropriate schedule, warehouse size, and execution frequency should be selected based on data volume, processing duration, cost, and freshness requirements.
 
 The job should be monitored for failures and unexpected source data, especially missing user or team metadata, invalid timestamps, duplicate query identifiers, and query events for which table references could not be extracted.
+
+## 9. Python Orchestration
+
+The ELT transformations can be orchestrated using Apache Airflow, which allows the pipeline to run on a schedule and defines dependencies between individual tasks.
+
+For example, the pipeline could validate the availability of source data, populate the dimension tables, load query-level facts, and finally populate the bridge table. This ordering ensures that the referenced dimensions and fact records exist before the bridge relationships are created.
+
+The following example illustrates how such a pipeline could be defined using an Airflow DAG. The task execution functions are placeholders for the corresponding Snowflake SQL transformations described above.
+
+```python
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+
+
+default_args = {
+    "owner": "mixi-o",
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
+}
+
+with DAG(
+    dag_id="trino_usage_elt",
+    default_args=default_args,
+    schedule="0 4 * * *",
+    start_date=datetime(2026, 10, 15),
+    catchup=False,
+    max_active_runs=1,
+) as dag:
+
+    validate_source = PythonOperator(
+        task_id="validate_source_data",
+        python_callable=validate_source_data,
+    )
+
+    populate_dimensions = PythonOperator(
+        task_id="populate_dimensions",
+        python_callable=populate_dimensions,
+    )
+
+    populate_fact = PythonOperator(
+        task_id="populate_fact_query",
+        python_callable=populate_fact_query,
+    )
+
+    populate_bridge = PythonOperator(
+        task_id="populate_bridge_query_table",
+        python_callable=populate_bridge_query_table,
+    )
+
+    (
+        validate_source
+        >> populate_dimensions
+        >> populate_fact
+        >> populate_bridge
+    )
+```
+
+The callable functions represent operations that would execute the corresponding validation and SQL statements against Snowflake. In a complete implementation, they would establish connections using appropriately configured credentials and execute the transformations.
+
+Airflow can schedule the pipeline, retry failed tasks, and prevent overlapping DAG runs. The transformations themselves remain in SQL, while Python handles orchestration.
