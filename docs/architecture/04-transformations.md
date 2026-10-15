@@ -347,7 +347,7 @@ The transformation deduplicates the source batch by `query_id` and inserts only 
 
 Because the source is assumed to provide final records for completed queries, existing fact records are not updated.
 
-The transformation excludes events missing required identifiers or timestamps. In a production implementation, such records should be monitored or sent to a separate error-handling process rather than silently discarded. `TODO!!!!!`
+The transformation excludes events missing required identifiers or timestamps. In a production implementation, invalid records can be written to a separate quarantine table together with a rejection reason, allowing them to be investigated and reprocessed once the missing or invalid data is corrected. Monitoring and alerting can track the number of rejected records and notify the responsible team when predefined thresholds are exceeded.
 
 The dimension records referenced by `user_id`, `team_id`, and `date_id` should be validated as part of the pipeline. Snowflake standard-table primary key constraints are generally not enforced, so the transformation logic must maintain key integrity.
 
@@ -405,25 +405,26 @@ The transformation assumes that `STAGED_QUERY_TABLE_REFERENCES` contains the ref
 
 ## 7. Incremental Processing and Idempotency
 
-`TODO!!!`
+The batch job should avoid repeatedly transforming the entire source history as the dataset grows. Two possible approaches are considered.
 
-The batch job should process new query events rather than repeatedly transforming the entire history.
+**Watermark-based processing:** The job tracks a reliable source watermark, such as an ingestion timestamp or another source-supported incremental processing cursor. Each run processes records newer than the last successfully processed position. If timestamp-based processing is used, a small overlapping window can reduce the risk of missing late-arriving events. Deduplication and merge logic prevent previously processed records from being inserted again.
 
-A production implementation can use a reliable source watermark, such as an ingestion timestamp or another source-supported incremental processing mechanism.
+**Date-range processing:** Alternatively, each run can rebuild a recent date range, such as the previous few days. The job deletes the existing records within that range and inserts the corresponding records from the raw tables again. This approach naturally incorporates late-arriving events and corrections within the selected range, provided the source data is available. The delete and insert operations must be executed atomically to avoid leaving the target tables partially populated if a run fails. Related tables, including `BRIDGE_QUERY_TABLE`, must be refreshed consistently.
 
-If timestamp-based processing is used, a small overlapping window can be reprocessed to reduce the risk of missing late-arriving events. The deduplication and merge logic prevents previously processed query executions and query-table relationships from being inserted again.
+The current SQL transformations scan the complete raw tables on each run. This is simple and suitable for an initial implementation, but its cost increases as the source history grows. A production implementation can introduce either of the incremental strategies described above.
 
-The pipeline should follow these principles:
+Regardless of the extraction strategy, the pipeline should follow these principles:
 
 - Dimension records are reused when their natural keys already exist.
 - New query executions are inserted into `FACT_QUERY`.
 - Existing query executions are not updated because source records are assumed to be final.
 - New query-table relationships are inserted into `BRIDGE_QUERY_TABLE`.
 - Reprocessing the same input does not create duplicate logical records.
+- Watermarks, if used, are advanced only after the corresponding processing succeeds.
+- Standard Snowflake table constraints are not sufficient protection against duplicate records; uniqueness must be maintained by the transformation logic.
+- The scheduled job must avoid overlapping executions.
 
-The uniqueness of dimension keys and bridge-table relationships must be maintained by the transformation logic. Standard Snowflake table constraints should not be treated as sufficient protection against duplicate records.
-
-The scheduled job should also be configured to avoid overlapping executions.
+The current insert-only approach assumes that completed source records are immutable. If existing records can be corrected, the pipeline must either update matched records or rebuild the affected date range. A date-range refresh can capture corrections only within the range being reprocessed.
 
 ## 8. Scheduling the Batch Job
 
