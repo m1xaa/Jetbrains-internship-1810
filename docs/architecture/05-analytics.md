@@ -17,8 +17,8 @@ JOIN dim_table dt
 WHERE dt.catalog_name = 'iceberg'
     AND dt.schema_name = 'analytics'
     AND dt.table_name = 'orders'
-    AND fq.event_timestamp >= '2026-10-01'
-    AND fq.event_timestamp < '2026-11-01';
+    AND fq.event_timestamp >= '2026-10-10'
+    AND fq.event_timestamp < '2026-11-15';
 ```
 
 ## 2. Resource Consumption by a Team During a Period
@@ -36,8 +36,8 @@ FROM FACT_QUERY fq
 JOIN DIM_TEAM t
     ON fq.team_id = t.team_id
 WHERE t.team_name = 'Team Y'
-  AND fq.event_timestamp >= '2026-10-01'
-  AND fq.event_timestamp < '2026-11-01'
+  AND fq.event_timestamp >= '2026-10-10'
+  AND fq.event_timestamp < '2026-11-15'
 GROUP BY t.team_name;
 ```
 

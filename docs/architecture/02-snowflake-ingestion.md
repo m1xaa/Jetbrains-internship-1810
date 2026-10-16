@@ -46,6 +46,8 @@ For this approach, the ingestion process consists of:
 
 The following sections illustrate this approach using Parquet files in S3. This is an example of a possible implementation, not an assumption that the existing Iceberg tables can be ingested by reading their Parquet files directly.
 
+This is the approach that we chose since it gives us complete control over data since it is placed in our meta DWH.
+
 ## 3. Accessing Source Files
 
 An Iceberg table is more than a collection of Parquet files. Iceberg metadata identifies the files belonging to a table and tracks snapshots, schema changes, and other table information, so we need to take that metadata into account.
@@ -80,7 +82,7 @@ Here, `s3_storage_integration` represents a Snowflake storage integration that m
 
 The bucket URL, integration name, and path must be replaced with the actual environment configuration.
 
-The stage makes the files accessible to Snowflake, but it does not automatically provide complete Iceberg table semantics. If the source is only available as an Iceberg table, we must use a supported Iceberg integration or export the relevant data before loading it this way.
+The stage makes the files accessible to Snowflake.
 
 ## 4. Staging Raw Events
 
@@ -178,7 +180,7 @@ The watermark should only advance after the relevant batch has been processed su
 
 Timestamp-based ingestion depends on the availability and reliability of the source event timestamp.
 
-Events may arrive late, so the ingestion process can reprocess a short eeriod before the last successfully processed watermark. This overlapping
+Events may arrive late, so the ingestion process can reprocess a short period before the last successfully processed watermark. This overlapping
 window reduces the risk of missing late events, while deduplication prevents previously ingested query executions from being inserted again.
 
 The overlap does not guarantee that every late event will be captured. If the source supports a reliable incremental mechanism based on Iceberg
@@ -242,10 +244,6 @@ WHERE NOT EXISTS (
 );
 ```
 
-This is an illustrative implementation of the deduplication and loading logic. It assumes that query records are final when they become available and that `query_id` is a stable identifier for each execution.
-
-The loading process must also account for concurrent runs if multiple ingestion processes can write to the same raw table.
-
 ## 7. User and Team Metadata
 
 User and team metadata may be available from separate source table, such as `STAGED_USERS`, `RAW_USERS` and `STAGED_TEAMS`, `RAW_TEAMS`. These tables could contain following fields and some additional information if accessible:
@@ -257,8 +255,6 @@ User and team metadata may be available from separate source table, such as `STA
 - `team_name` - name of a team.
 
 These datasets are joined during downstream transformations to associate each query execution with the relevant user and team.
-
-If users can change teams, historical membership must be considered so that past query executions remain attributed to the team the user belonged to when the query was executed. The available source metadata must be verified to determine whether historical membership can be reconstructed reliably.
 
 ## 8. Handling Failed Runs
 

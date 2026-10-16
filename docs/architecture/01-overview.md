@@ -56,8 +56,6 @@ The warehouse will use a star schema centered on query executions. The main fact
 
 Time-related dimensions will support aggregations across different periods. A separate table will represent the relationship between queries and the tables they access, since a single query can reference multiple tables.
 
-User and team attributes will be stored directly in the query fact table where appropriate, keeping common analytical queries simple.
-
 The detailed schema, table granularity, relationships, and transformation logic will be described separately.
 
 ## 4. Historical Data
@@ -88,7 +86,7 @@ The initial design relies on the following assumptions:
 - Query executions can be uniquely identified, for example by a query ID.
 - User identifiers are available in the query events.
 - Team membership can be obtained from the source events or an additional metadata source.
-- Accessed tables can be identified from the available event metadata or extracted through query analysis.
+- Accessed tables can be etracted from the sql query text.
 - Resource usage metrics depend on the fields exposed by the existing Trino event collection.
 
 Any missing metadata and the approach used to obtain it will be documented alongside the source data and transformation specifications.

@@ -43,10 +43,6 @@ The implementation assumes that `RAW_QUERY_EVENTS` contains the following column
 
 The actual source schema must be verified before implementation.
 
-Each source record represents a completed query execution, and `query_id` uniquely identifies that execution.
-
-The `team_id` recorded in a query event represents the team associated with the execution. This allows historical query executions to remain attributed to the appropriate team, provided that the source event preserves the team membership valid at execution time.
-
 ### Table Reference Extraction
 
 The source events contain `query_text`, but do not directly provide the structured list of tables accessed by each query.
@@ -63,6 +59,8 @@ The extraction produces an intermediate relation named `STAGED_QUERY_TABLE_REFER
 | `table_name` | Name of the referenced table. |
 
 The implementation of SQL parsing is outside the scope of this document. The transformations described below assume that this intermediate data is available.
+
+This part could be done after extracting data from Iceberg to Snowflake staging tables. The choice to do it now is so we could store actual raw data in raw tables.
 
 ## 3. Transformation Strategy
 
@@ -119,9 +117,7 @@ WHEN NOT MATCHED THEN
     );
 ```
 
-The `date_id` uses the `YYYYMMDD` representation of the calendar date.
-
-This transformation is idempotent: executing it repeatedly does not insert the same date again, assuming a single job instance and unique date keys.
+The `date_id` uses the `YYYYMMDD` representation of the calendar date. So the actual date is the key in a table which is quite handy when checking if a date already exists in table.
 
 ### 4.2. DIM_USER
 
@@ -166,8 +162,6 @@ WHEN NOT MATCHED THEN
 ```
 
 This transformation inserts new users and updates the stored name when an existing user's name changes.
-
-The source is expected to contain a single logical record per user. If multiple records exist for the same user, a reliable source ordering column should be used to select the correct record.
 
 ### 4.3. DIM_TEAM
 
@@ -215,7 +209,7 @@ This transformation inserts new teams and updates their descriptive information 
 
 The model does not maintain a history of team names. Historical query attribution is instead preserved by storing the relevant `team_id` in `FACT_QUERY`.
 
-As with `DIM_USER`, the source is expected to contain a single logical record per team. If duplicate source records exist, the transformation should use a reliable ordering column to select the correct record.
+As with `DIM_USER`, the source is expected to contain a single logical record per team.
 
 ### 4.4. DIM_TABLE
 
@@ -411,8 +405,6 @@ The batch job should avoid repeatedly transforming the entire source history as 
 
 **Date-range processing:** Alternatively, each run can rebuild a recent date range, such as the previous few days. The job deletes the existing records within that range and inserts the corresponding records from the raw tables again. This approach naturally incorporates late-arriving events and corrections within the selected range, provided the source data is available. The delete and insert operations must be executed atomically to avoid leaving the target tables partially populated if a run fails. Related tables, including `BRIDGE_QUERY_TABLE`, must be refreshed consistently.
 
-The current SQL transformations scan the complete raw tables on each run. This is simple and suitable for an initial implementation, but its cost increases as the source history grows. A production implementation can introduce either of the incremental strategies described above.
-
 Regardless of the extraction strategy, the pipeline should follow these principles:
 
 - Dimension records are reused when their natural keys already exist.
@@ -426,26 +418,7 @@ Regardless of the extraction strategy, the pipeline should follow these principl
 
 The current insert-only approach assumes that completed source records are immutable. If existing records can be corrected, the pipeline must either update matched records or rebuild the affected date range. A date-range refresh can capture corrections only within the range being reprocessed.
 
-## 8. Scheduling the Batch Job
-
-The transformations are intended to run as a scheduled batch job during a period of relatively low expected resource utilization.
-
-A daily schedule is a reasonable initial choice. The job should execute the transformations in the following order:
-
-1. `DIM_DATE`
-2. `DIM_USER`
-3. `DIM_TEAM`
-4. `DIM_TABLE`
-5. `FACT_QUERY`
-6. `BRIDGE_QUERY_TABLE`
-
-The scheduler can be implemented using Snowflake Tasks or an external orchestration system.
-
-The appropriate schedule, warehouse size, and execution frequency should be selected based on data volume, processing duration, cost, and freshness requirements.
-
-The job should be monitored for failures and unexpected source data, especially missing user or team metadata, invalid timestamps, duplicate query identifiers, and query events for which table references could not be extracted.
-
-## 9. Python Orchestration
+## 8. Python Orchestration - Scheduling a Batch Job
 
 The ELT transformations can be orchestrated using Apache Airflow, which allows the pipeline to run on a schedule and defines dependencies between individual tasks.
 

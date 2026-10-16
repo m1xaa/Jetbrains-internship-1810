@@ -4,7 +4,7 @@
 
 The Meta Data Warehouse (DWH) is designed to analyze how Trino query executions use data tables and consume computational resources over time.
 
-The model consists of two fact-like tables, one bridge table, and four dimensions:
+The model consists of one fact table, one bridge table, and four dimensions:
 
 - `FACT_QUERY` — stores information about query executions and their resource consumption.
 - `BRIDGE_QUERY_TABLE` — connects query executions to the tables they accessed.
@@ -122,7 +122,9 @@ The combination of `query_id` and `table_id` serves as the logical composite key
 
 Keeping only the identifiers in this table avoids repeatedly storing catalog, schema, and table names. The descriptive table metadata is retrieved through `DIM_TABLE`.
 
-The table access information should preferably come from reliable Trino metadata. If it must be extracted from SQL text, the transformation needs to account for constructs such as aliases, common table expressions, nested queries, views, and partially qualified table names.
+### 2.7 Alternative Approach for storing tables
+
+Another approach would be to keep records in this format `query_id`, `catalog_name`, `schema_name`, and `table_name` instead of keeping `BRIDGE_QUERY_TABLE` and `DIM_TABLE`. Then we could extract tables from each query and just append it to the table called `QUERY_TABLE_DIM` for example. The upside of this approach would be that we would need one less join per query, but the major downside is that for each query we would need to insert new rows into this `QUERY_TABLE_DIM`, one row for each accessed table in query (a lot of entries). That is why I decided to not move forward with this approach. And also, number of tables usually is not that large, so the current `DIM_TABLE` table shouldn't contain a lot of rows, hence making the join on this table not that expensive.
 
 ## 3. Relationships
 
@@ -170,39 +172,7 @@ Consequently:
 - Table usage analysis uses `BRIDGE_QUERY_TABLE`, joined to `FACT_QUERY` when user, team, or execution time information is needed.
 - Table metadata is retrieved by joining `BRIDGE_QUERY_TABLE` to `DIM_TABLE`.
 
-### 4.2. Surrogate Keys for Table Identification
-
-`DIM_TABLE` uses a surrogate key, `table_id`, to represent each distinct table.
-
-The transformation identifies tables using the combination of `catalog_name`, `schema_name`, and `table_name`. Existing dimension records are reused, and new records are inserted only for previously unseen combinations.
-
-This reduces repeated storage of table metadata and provides a consistent key for joining table information to query executions.
-
-The uniqueness of the three-part name must be enforced by the transformation logic. In a concurrent ingestion environment, the implementation must also prevent simultaneous runs from inserting duplicate dimension records.
-
-### 4.3. User-to-Team Mapping
-
-Each query execution is associated with the team the user belonged to at execution time.
-
-If users can change teams, the transformation needs historical membership information to assign executions correctly. A mapping containing only each user's current team is insufficient for accurate historical attribution.
-
-The availability and structure of this metadata must be verified before implementation.
-
-### 4.4. Source Metadata Assumptions
-
-The proposed model assumes that the source provides one final record per completed query execution, with a stable identifier such as `query_id`.
-
-The actual source schema must be verified to confirm:
-
-- Which query execution metrics are available.
-- Whether the source provides reliable table access metadata.
-- Whether user and team metadata are available.
-- Whether historical team membership can be reconstructed.
-- Whether catalog, schema, and table names are sufficient to identify tables reliably.
-
-Any unavailable fields or relationships will require additional metadata sources or transformations.
-
-### 4.5. Possible Future Improvements
+### 4.2. Possible Future Improvements
 
 A future improvement would be to use a stable table identifier obtained from Trino event metadata or catalog metadata, if one is available and reliable for the required use case.
 
