@@ -38,8 +38,6 @@ flowchart TD
 
 ### Snowflake ingestion
 
-### Snowflake ingestion
-
 The raw Apache Iceberg tables stored in Amazon S3 must be made available in Snowflake before they can be transformed into the analytical model.
 
 This part of the pipeline is also within the scope of the project. We will describe and implement the necessary steps to access the source data in Snowflake and populate the corresponding raw tables, depending on the available Snowflake and Iceberg configuration.
@@ -57,8 +55,6 @@ The transformations should also handle duplicate events and support incremental 
 The warehouse will use a star schema centered on query executions. The main fact table will store one record per query, including its user, team, execution time, and available resource usage metrics.
 
 Time-related dimensions will support aggregations across different periods. A separate table will represent the relationship between queries and the tables they access, since a single query can reference multiple tables.
-
-User and team attributes will be stored directly in the query fact table where appropriate, keeping common analytical queries simple.
 
 The detailed schema, table granularity, relationships, and transformation logic will be described separately.
 
@@ -90,7 +86,7 @@ The initial design relies on the following assumptions:
 - Query executions can be uniquely identified, for example by a query ID.
 - User identifiers are available in the query events.
 - Team membership can be obtained from the source events or an additional metadata source.
-- Accessed tables can be identified from the available event metadata or extracted through query analysis.
+- Accessed tables can be etracted from the sql query text.
 - Resource usage metrics depend on the fields exposed by the existing Trino event collection.
 
 Any missing metadata and the approach used to obtain it will be documented alongside the source data and transformation specifications.
